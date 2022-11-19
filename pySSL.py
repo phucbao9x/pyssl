@@ -1,7 +1,23 @@
-from pyssl._makecode import (
-    makessl,
-    default_value as DV
-)
+# Version 0.0.3a0 (TV)
+# Fixing: Interface Console and DNS-IP problems
+# Pre-version: 0.0.2a0
+# Author: Phuc Bao (Samson)
+# Date: 19/11/22
+
+# Feature:
+# - Using RSA encrypto algorithm for generate key
+# - The SHA encrypto algorithms supported by pythonssl to make the sign:
+#     + SHA11
+#     + SHA224
+#     + SHA256
+#     + SHA384
+#     + SHA3_224
+#     + SHA3_256
+#     + SHA3_384
+#     + SHA3_512
+#     + SHA512512
+#     + SHA512_256
+#     + SHA512_224
 
 from pyssl._pyssl import (
     PySSL,
@@ -10,17 +26,6 @@ from pyssl._pyssl import (
 
 import subprocess
 import sys, os
-
-def inputvalue(cast = str):
-    while True:
-        tmp = input('>>')
-        if tmp == "": return 'ENT'
-        else:
-            try: 
-                return cast(tmp)
-            except:
-                print('It\'s only supported for %s'%cast.__name__)
-                exit(0)
 
 #Verion 0.0.2:
 import winreg as wr
@@ -36,6 +41,11 @@ def checkVT100():
         return False
 
 from color import *
+from color import (
+    ExitCommandActivity,
+    EnterActivity
+)
+
 
 def echooff(): os.system('echo off')
 def clsr(pause : bool = False): 
@@ -49,42 +59,57 @@ def arr_InfoOf(text):
     tmp_arr = []
     info(text)
     while True:
-        tmp = IPut('$>>')
-        if tmp == '^enter^' or tmp == '^exit^':break
-        tmp_arr.append(tmp)
-    ed = 's' if len(tmp_arr) > 1 else ''
-    success(f'{arrow2}Appended your data successful! With {len(tmp_arr)} value{ed}', sep=False)
-    return tmp_arr
+        try:
+            tmp = IPut('$>>')
+            tmp_arr.append(tmp)
+        except EnterActivity or ExitCommandActivity: break
+    if tmp_arr:
+        ed = 's' if len(tmp_arr) > 1 else ''
+        success(f'{arrow2}Appended your data successful! With {len(tmp_arr)} value{ed}', sep=False)
+        return tmp_arr
+    else:
+        from socket import (gethostbyname as GHBN, gethostname as GHN)
+        return ['0.0.0.0', '127.0.0.1', GHBN(GHN())]
 
 def dict_InfoOf(text, **key_appear):
     tmp_dict = {}
     MAX_LENGHT_LEFT = 0
     MAX_LENGHT_RIGHT = 0
     info(text)
+
     for key in key_appear:
-        t = f'${key_appear[key]}>>'
-        tmp = IPut(t)
-        if tmp != '^exit^' and tmp != '^enter^': 
-            tmp_dict[key] = tmp
-            tmp_len =  len(key) + len(key_appear[key]) + 2 , len(tmp)
-            MAX_LENGHT_LEFT = tmp_len[0] if tmp_len[0] > MAX_LENGHT_LEFT else MAX_LENGHT_LEFT
-            MAX_LENGHT_RIGHT = tmp_len[1] if tmp_len[1] > MAX_LENGHT_RIGHT else MAX_LENGHT_RIGHT
-        elif tmp == '^exit^':
-            break
+        try:
+            t = f'${key_appear[key]}>>'
+            tmp_dict[key] = IPut(t)
+            tmp_len =  len(key) + len(key_appear[key]) + 2 , len(tmp_dict[key])
+            MAX_LENGHT_LEFT = max([tmp_len[0], MAX_LENGHT_LEFT])
+            MAX_LENGHT_RIGHT =  max([tmp_len[1], MAX_LENGHT_RIGHT])
+        except ExitCommandActivity: break
+        except EnterActivity: continue
+
     for i in tmp_dict:
         success('OK', end='')
         setvalue(
-            f'{key_appear[i]}({i})', 
-            tmp_dict[i], 
+            f'{key_appear[i]}({i})', tmp_dict[i], 
             fmttext=f'set %{MAX_LENGHT_LEFT}s {arrow2} %{MAX_LENGHT_RIGHT}s')
-    return tmp_dict
+    if tmp_dict: return tmp_dict
+    else:
+        if 'CN' in key_appear: return {'CN' : 'FullstackMqtt certificate', 'C' : 'Vi'}
+        return {}
 
-def select_InfoOf(text, list_value):
+def select_InfoOf(text, option):
     info(text)
-    for i in range(len(list_value)):
-        O(f'{i}.{list_value[i]}')
-    tmp = IPut('$>>', int)
-    return list_value[tmp]
+    if type(option) is dict: option = list(option.keys())
+    elif type(option) is list: option = option
+    else: raise Exception('Data type must be iterator or dictionary')
+    # Print selections
+    for i in range(len(option)): O(f'{i}.{option[i]}')
+
+    try: tmp = IPut('$>>', int)
+    except EnterActivity or ExitCommandActivity:tmp = 2
+    except ValueError: raise Exception('I don\'t have any idea what you wanting')
+    finally: O(RS(), end='')
+    return option[tmp]
 
 
 namedict = {
@@ -128,8 +153,11 @@ def runcmd():
     if not checkVT100():
         print('Run file install.py to setup enviroment!')
         exit(0)
+
+    #Setting Interface
     echooff()
     settitle('PySSL Tools')
+
     clsr()
     dns_ip = arr_InfoOf('Type DNS/IP supported by certificate (press enter when property is empty to finished)')
     clsr(True)
@@ -139,66 +167,48 @@ def runcmd():
     clsr(True)
     tmpk = {'KS': "key_size", 'PE': 'public_exponent', "BE": "backendfile"}
     rsa_information = {}
-    while tmpk:
-        O(f'{"configure the encrypto":=^50}')
-        rsa_information.update(**dict_InfoOf('RSA configure', **tmpk))
+    def Check(text, dict_data, key, default, dict_need_to_get, func_test):
         try:
-            tmp = rsa_information['KS']
-            warning('CHECK key size', end="")
-            if int(tmp) >= 2048: 
-                success('OK', sep=False)
-                tmpk.pop('KS')
-                rsa_information['KS'] = int(tmp)
-            else:
-                dangerous('NOT SECURE', sep=False)
-            pass
+            tmp = dict_data[key]
+            warning(text, end="")
+            try:
+                if func_test(tmp): 
+                    success('OK', sep=False)
+                    dict_need_to_get.pop(key)
+                    dict_data[key] = int(tmp)
+                else: dangerous('NOT SECURE', sep=False)
+            except ValueError:
+                dangerous('VALID VALUE', sep=False)
         except:            
-            rsa_information['KS'] = 2048
-            tmpk.pop('KS')
-        try:
-            tmp = rsa_information['PE']
-            warning('CHECK public exponent', end="")
-            if int(tmp) >= 2**16+1: 
-                success('OK', sep=False)
-                tmpk.pop('PE')
-                rsa_information['PE'] = int(tmp)
-            else:
-                dangerous('NOT SECURE', sep=False)
-        except:
-            rsa_information['PE'] = 2**16 + 1
-            tmpk.pop('PE')
-            
-        try:
-            tmp = rsa_information['BE']
-            warning('CHECK backend file', end="")
-            if os.path.isfile(tmp):
-                setvalue('$databackend', f'reader({tmp})', 
-                        fmttext=f'set $s {arrow2} %s', end=":")
-                success('OK', sep=False)                
-                tmpk.pop('BE')
-            else:
-                dangerous('NOT EXIST', sep=False)
-        except: 
-            rsa_information['BE'] = default_backend()
-            tmpk.pop('BE')
+            dict_data[key] = default
+            dict_need_to_get.pop(key)
+        return dict_data, dict_need_to_get
+
+    while tmpk:
+        O(f'{"configure the RSA encrypto":=^50}')
+        rsa_information.update(**dict_InfoOf('RSA configure', **tmpk))
+        rsa_information, tmpk = Check('Check key size', rsa_information, 'KS', 2048, tmpk, lambda x : int(x) >= 2048)
+        rsa_information, tmpk = Check('Check public exponent', rsa_information, 'PE', 2**16 + 1, tmpk, lambda x: int(x) >= 2**16+1)
+        rsa_information, tmpk = Check('Check backend file', rsa_information, 'BE', default_backend(), tmpk, lambda x: os.path.isfile(x))
+        
         if tmpk:
-            tmp = input('Press enter to re-text; type "!exit" to exit the program: ')
-            if tmp == '!exit':
-                O(RS())
+            try: tmp = input('$press enter to re-input; type "!exit" to exit the program>>')
+            except ExitCommandActivity:
+                O(RS(), end='')
                 exit(1)
-            clsr(True)
+            except EnterActivity:
+                clsr(True)
+                continue
+    
     clsr(True)
     typeSHA = shaenc[select_InfoOf('SHA TYPE', list(shaenc.keys()))]
-    O(RS())
     clsr(True)
+
     O(f'{"setting":=^50}')
-    try:serialnum = IPut('$serial number>>', int)
-    except: serialnum = 1000
-    O(RS())
-    try: days = IPut('$days>>', int)
-    except: days = 365
+    serialnum = IPut('$serial number>>', int, default=1000)
+    days = IPut('$days>>', int, default= 365)
+    
     kwargs = {}
-    O(RS())
     if issuedto: kwargs['issueto'] = issuedto
     if issuedby: kwargs['issueby'] = issuedby
     if serialnum: kwargs['serialnumber'] = serialnum
@@ -207,6 +217,7 @@ def runcmd():
     kwargs['key_size'] = rsa_information['KS']
     kwargs['typeSHA'] = typeSHA
     kwargs['days'] = days
+
     warning('Check infomation', end="")
     try:
         a = PySSL(**kwargs)
@@ -227,7 +238,7 @@ def runcmd():
         
     info('Make name', end='')
     try:
-        a.makealtname()
+        a.makealtname(dns_ip)
         success('OK', sep=False)
     except: 
         dangerous('FAIL', sep=False)
@@ -266,15 +277,15 @@ def runcmd():
     except: 
         dangerous('FAIL', sep=False)
         exit(0)
-    info('Status builded')
-    success('Finished all', end='')
+    info('Status builded', end='')
+    success('Finished all', sep=False)
 
     filecertio = IPut('$file cert>>')
     if filecertio == '^enter^':
-        filecertio = issuedto['CN']+ '.crt'
+        filecertio = issuedto['CN']
     filekeyio = IPut('$file key>>')
     if filekeyio == '^enter^':
-        filekeyio = issuedto['CN']+ '_pri.pem'
+        filekeyio = issuedto['CN']+ '_pri'
     info('export file', end='')
     
     try:
@@ -289,4 +300,4 @@ def runcmd():
     O(ColourText(os.path.abspath(filecertio), (255, 255, 14)))
     O(ColourText(os.path.abspath(filekeyio), (255, 255, 14)))
 
-runcmd()
+if __name__ == "__main__": runcmd()

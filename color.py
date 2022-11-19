@@ -1,3 +1,6 @@
+class EnterActivity(Exception): pass
+class ExitCommandActivity(Exception): pass
+
 import typing as t
 arrow2 = '\u2192'
 
@@ -38,7 +41,7 @@ def success(text: str, sep = True, end = '\n'):
     O(RS(), end='')
 
 def fail(text: str, sep = True, end = '\n'):
-    dangerous(text, end)
+    dangerous(text, sep, end)
 
 def setvalue(object : str, value, fmttext : str = ..., sep = True,end='\n'):
     try: text = fmttext%(object, str(value).strip())
@@ -51,12 +54,12 @@ def setvalue(object : str, value, fmttext : str = ..., sep = True,end='\n'):
 def defaultprocess(txt: str):
     return txt.strip()
 
-def IPut(text, cast : type = str, process : t.Callable[..., t.Any] = defaultprocess):
+def IPut(text, cast : type = str, process : t.Callable[..., t.Any] = defaultprocess, default : t.Any = ...):
     k = input(RS() + text + FG(255, 255, 0))
-    if k == '!exit':
-        O(RS(), end='')
-        return '^exit^'
-    elif k == '':
-        O(RS(), end='')
-        return '^enter^'
-    return cast(process(k))
+    O(RS(), end='')
+    if k == '!exit': raise ExitCommandActivity
+    elif k == '': raise EnterActivity
+    try: return cast(process(k))
+    except:
+        if default != ...: return default
+        else: raise ValueError
