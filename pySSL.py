@@ -218,6 +218,7 @@ def runcmd():
     kwargs['typeSHA'] = typeSHA
     kwargs['days'] = days
 
+    clsr(True)
     warning('Check infomation', end="")
     try:
         a = PySSL(**kwargs)
@@ -225,20 +226,11 @@ def runcmd():
     except:
         dangerous('FAIL', sep=False)
         exit(0)
-    clsr(True)
     O(f'{"make":=^50}')
 
     info('Make key', end='')
     try:
         a.generatekey()
-        success('OK', sep=False)
-    except: 
-        dangerous('FAIL', sep=False)
-        exit(0)
-        
-    info('Make name', end='')
-    try:
-        a.makealtname(dns_ip)
         success('OK', sep=False)
     except: 
         dangerous('FAIL', sep=False)
@@ -254,7 +246,7 @@ def runcmd():
 
     info('Make alternate name', end='')
     try:
-        a.makealtname()
+        a.makealtname(*dns_ip)
         success('OK', sep=False)
     except: 
         dangerous('FAIL', sep=False)
@@ -280,13 +272,13 @@ def runcmd():
     info('Status builded', end='')
     success('Finished all', sep=False)
 
-    filecertio = IPut('$file cert>>')
-    if filecertio == '^enter^':
-        filecertio = issuedto['CN']
-    filekeyio = IPut('$file key>>')
-    if filekeyio == '^enter^':
-        filekeyio = issuedto['CN']+ '_pri'
-    info('export file', end='')
+    try: filecertio = IPut('$file cert>>')
+    except EnterActivity: filecertio = issuedto['CN']
+    except ExitCommandActivity: filekeyio = issuedto['CN']+ '_pri'
+    try: filekeyio = IPut('$file private key>>')
+    except EnterActivity: filekeyio = issuedto['CN']+ '_pri'
+    except ExitCommandActivity: filekeyio = issuedto['CN']+ '_pri'
+    info('Export file', end='')
     
     try:
         a.exportfile(filecertio, filekeyio)
@@ -294,10 +286,10 @@ def runcmd():
     except: 
         dangerous('FAIL', sep=False)
         exit(0)
-    input('Enter to close')
+    input('Enter to end')
     clsr()
     O('Check it at: ')
-    O(ColourText(os.path.abspath(filecertio), (255, 255, 14)))
-    O(ColourText(os.path.abspath(filekeyio), (255, 255, 14)))
+    O(ColourText(os.path.abspath(filecertio+'.crt'), (255, 255, 14)))
+    O(ColourText(os.path.abspath(filekeyio + '.pem'), (255, 255, 14)))
 
 if __name__ == "__main__": runcmd()

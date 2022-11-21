@@ -57,8 +57,12 @@ def defaultprocess(txt: str):
 def IPut(text, cast : type = str, process : t.Callable[..., t.Any] = defaultprocess, default : t.Any = ...):
     k = input(RS() + text + FG(255, 255, 0))
     O(RS(), end='')
-    if k == '!exit': raise ExitCommandActivity
-    elif k == '': raise EnterActivity
+    if default == ...:
+        if k == '!exit': raise ExitCommandActivity
+        elif k == '': raise EnterActivity
+    else: 
+        if k == '!exit' or k == '': return default
+        
     try: return cast(process(k))
     except:
         if default != ...: return default
