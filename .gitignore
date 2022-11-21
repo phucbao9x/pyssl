@@ -1,7 +1,8 @@
 setup.py 
 requirement.txt 
-PySSL.egg-info 
+pythonssl.egg-info 
 MANIFEST.in 
 buildpyd.py 
 build 
 __pycache__ 
+dist
